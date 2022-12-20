@@ -58,14 +58,22 @@ const documentSchema = new mongoose.Schema({
 });
 
 
+// generating Token When User Registers and LogIn
 documentSchema.methods.createToken = async function(){
     const generateToken = jwt.sign({id: this._id.toString()}, process.env.SECRET_KEY);
 
     this.tokenVal = this.tokenVal.concat({firstToken: generateToken});
+    
+    this.confirmPassword = await bcrypt.hash(this.password, 9); // we need to define this because while saving the document in database, it checks all the documentSchema and it requires all field to be there.
+
+    this.save(); // Saving beacuse we have to concatenate the tokens every time user registers or login
     return generateToken;
 }
 
 
+
+// Converting Password into HASH before storing it into Database
+// i.e Before SAVE method
 documentSchema.pre("save", async function (next) {
     if (this.isModified("password")) {
         this.password = await bcrypt.hash(this.password, 9);

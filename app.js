@@ -4,12 +4,18 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const hbs = require("hbs");
+const cookieParse = require("cookie-parser");
+
+const authenticate = require("./src/Authetication/authenticateUser");
 
 require("./src/DB/connection");
 const userData = require("./src/Model/userDataModel");
 const userRouter = require("./src/Routers/userDetailsRouter");
+const cookieParser = require("cookie-parser");
 
 app.use(express.json());
+
+app.use(cookieParse());
 
 app.use(userRouter);
 
@@ -47,6 +53,45 @@ app.get("/resetPassword", (req, res) => {
     res.render("ResetPassword");
 });
 
+app.get("/secretPage", authenticate, (req, res) => {
+
+    res.render("SecretPage.hbs");
+    console.log(req.getData);
+
+})
+
+app.get("/signOut", authenticate, async (req, res) => {
+    try {
+
+        // LOGOUT FROM A SINGLE DEVICE
+        // req.getData.tokenVal = req.getData.tokenVal.filter((curValue)=>{
+        //      return curValue.firstToken !== req.token;
+        // });
+
+
+
+
+        //LOGOUT FROM MULTIPLE / ALL DEVICES
+        req.getData.tokenVal = [];
+
+
+        
+
+        res.clearCookie("logInCookie");
+
+        console.log("Cookie Cleared..");
+        console.log(req.getData);
+
+        await req.getData.save();
+        res.render("LogInPage");
+    } catch (err) {
+        res.send("<h1>Cant Access!!</h1>")
+    }
+
+})
+
+
+
 
 
 //REGISTERING THE USER AND STORING DETAILS IN DATABASE..
@@ -55,8 +100,7 @@ app.post("/registerUser", async (req, res) => {
         const getPassWord = req.body.password;
         const getconfirmPassword = req.body.confirmPassword;
 
-        if(getPassWord === getconfirmPassword)
-        {
+        if (getPassWord === getconfirmPassword) {
             const insertData = new userData({
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
@@ -65,10 +109,16 @@ app.post("/registerUser", async (req, res) => {
                 confirmPassword: req.body.confirmPassword,
                 mobile: req.body.mobile,
             });
-            
+
             //MIDDLEWARE FOR GENERATING REGISTRATION TOKEN
             const registerToken = await insertData.createToken();
-            console.log("Register Token = "+registerToken);
+            console.log("Register Token = " + registerToken);
+
+            //ADD COOKIE TO A SITE WHEN USER REGISTERS HIMSELF ON THE SITE
+            // IT ACCEPTS 2 PARAMETERS, FIRST IS ANY NAME YOU WANT TO GIVE TO COOKIE AND SECOND IS THE TOKEN GENERATED WHILE REGISTERING
+            res.cookie("firstHandCookie", registerToken);
+
+
 
 
             const getData = await insertData.save();
@@ -78,7 +128,7 @@ app.post("/registerUser", async (req, res) => {
             res.send("Please Enter Matching Passwords..");
         }
     } catch (err) {
-        res.send("Kuch Toh Gadbad Jaroor HaiDaya...");
+        res.send(err);
     }
 
 });
@@ -99,9 +149,14 @@ app.post("/loginUser", async (req, res) => {
         console.log(getPasswordValidation);
 
         if (getPasswordValidation) {
+
             // GENERATING LOGIN TOKEN
             const logInToken = await getData.createToken();
-            console.log("Log In Token = "+logInToken);
+            console.log("Log In Token = " + logInToken);
+
+
+            //adding cookie of Login Details
+            res.cookie("logInCookie", logInToken);
 
             res.render("WelcomePage");
         }
@@ -130,7 +185,7 @@ app.post("/resetPassword", async (req, res) => {
         const getData = await userData.findOne({ email: getEmail });
         const getActualDatabasePassword = await getData.password;
 
-        console.log("Data -> "+getData+"\n\nEmail = "+getEmail+"\nPassword Before = " + getActualDatabasePassword);
+        console.log("Data -> " + getData + "\n\nEmail = " + getEmail + "\nPassword Before = " + getActualDatabasePassword);
 
         //CHECK IF USER ENTERED MATCHING INPUTS ('TO BE CHANGED' PASSWORDS)
         if (getNewPassword === confirmNewPassword) {
